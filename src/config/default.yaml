@@ -1,0 +1,23 @@
+# Model settings
+model:
+  name: "microsoft/wavlm-base-plus"
+  projection_dim: 512
+  prediction_dim: 512
+  ema_decay: 0.996
+
+# Training settings
+training:
+  batch_size: 32
+  num_epochs: 30
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+# Data settings
+data:
+  clean_data_path: "/proj/speech/users/syk2145/data/Audios_en_sgmse/clean"
+  noise_data_path: "data/noise"
+  sample_rate: 16000
+  max_audio_length: 5.0  # in seconds
+  snr_range: [0, 5, 10, 15, 20]

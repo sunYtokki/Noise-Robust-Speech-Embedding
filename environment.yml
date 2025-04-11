@@ -1,0 +1,21 @@
+name: nrse
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - torchaudio
+  # - cudatoolkit  # specify version based on your GPU
+  - pip:
+    - transformers
+    - datasets
+    - librosa
+    - soundfile
+    - scikit-learn
+    - matplotlib
+    - wandb
+    - hydra-core
+    - tqdm

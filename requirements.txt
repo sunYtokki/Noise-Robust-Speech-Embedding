@@ -1,0 +1,11 @@
+torch
+torchaudio
+transformers
+datasets
+librosa
+soundfile
+scikit-learn
+matplotlib
+wandb
+hydra-core
+tqdm
