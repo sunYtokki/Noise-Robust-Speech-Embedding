@@ -1,0 +1,30 @@
+# Model settings
+model:
+  name: "microsoft/wavlm-base-plus" # encoder backbone
+  projection_dim: 512
+  prediction_dim: 512
+  ema_decay: 0.996
+
+# Training settings
+training:
+  batch_size: 16
+  num_workers: 8
+  num_epochs: 100
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  checkpoint_dir: "checkpoints/0412"
+  log_dir: "outputs/0412"
+
+# Data settings
+data:
+  clean_data_path: "/proj/speech/users/syk2145/data/Audios_en_sgmse/clean"
+  noise_data_path: "/proj/speech/projects/noise_robustness/Audioset/Audioset-train"
+  sample_rate: 16000
+  max_audio_length: 5.0  # in seconds
+  snr_range: [0, 2, 4, 6, 8, 10]
+
+logging:
+  wandb_mode: "offline" # "online", "offline", or "disabled"
+  metric_logging_interval: 5
+  visualization_interval: 10
+
