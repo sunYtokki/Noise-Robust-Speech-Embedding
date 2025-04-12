@@ -7,6 +7,10 @@ from typing import Dict, List
 from transformers import AutoFeatureExtractor
 
 from .augment import add_noise_to_speech
+<<<<<<< HEAD
+=======
+from src.utils.logging_utils import logger
+>>>>>>> dev
 
 class NoiseRobustSpeechDataset(Dataset):
     def __init__(self, 
@@ -86,7 +90,11 @@ class NoiseRobustSpeechDataset(Dataset):
             
             # If invalid audio, try the next file
             if clean_speech is None:
+<<<<<<< HEAD
                 print(f"Invalid clean speech file, trying next (attempt {attempt+1})")
+=======
+                logger.debug(f"Invalid clean speech file, trying next (attempt {attempt+1})")
+>>>>>>> dev
                 idx = (idx + 1) % len(self.clean_files)
                 continue
             
@@ -96,7 +104,7 @@ class NoiseRobustSpeechDataset(Dataset):
             
             # If invalid noise, try another noise file
             if noise is None:
-                print(f"Invalid noise file, trying another (attempt {attempt+1})")
+                logger.debug(f"Invalid noise file, trying another (attempt {attempt+1})")
                 continue
             
             # Select random SNR
@@ -107,7 +115,7 @@ class NoiseRobustSpeechDataset(Dataset):
             
             # If noise addition failed, try again
             if noisy_speech is None:
-                print(f"Noise addition failed, trying again (attempt {attempt+1})")
+                logger.debug(f"Noise addition failed, trying again (attempt {attempt+1})")
                 continue
             
             # Normalize audio
@@ -117,11 +125,11 @@ class NoiseRobustSpeechDataset(Dataset):
                 
                 # Check if normalization would cause issues
                 if clean_max < 1e-8:
-                    print(f"Clean speech maximum too small: {clean_max.item()}")
+                    logger.debug(f"Clean speech maximum too small: {clean_max.item()}")
                     continue
                     
                 if noisy_max < 1e-8:
-                    print(f"Noisy speech maximum too small: {noisy_max.item()}")
+                    logger.debug(f"Noisy speech maximum too small: {noisy_max.item()}")
                     continue
                 
                 clean_speech = clean_speech / (clean_max + 1e-8)
@@ -129,15 +137,15 @@ class NoiseRobustSpeechDataset(Dataset):
                 
                 # Final NaN check after normalization
                 if torch.isnan(clean_speech).any():
-                    print("Normalized clean speech contains NaN values!")
+                    logger.debug("Normalized clean speech contains NaN values!")
                     continue
                     
                 if torch.isnan(noisy_speech).any():
-                    print("Normalized noisy speech contains NaN values!")
+                    logger.debug("Normalized noisy speech contains NaN values!")
                     continue
                 
             except Exception as e:
-                print(f"Error during normalization: {e}")
+                logger.debug(f"Error during normalization: {e}")
                 continue
             
             # Process with feature extractor
@@ -155,11 +163,11 @@ class NoiseRobustSpeechDataset(Dataset):
                 
                 # Final NaN check after feature extraction
                 if torch.isnan(clean_input.input_values).any():
-                    print("Feature-extracted clean input contains NaN values!")
+                    logger.debug("Feature-extracted clean input contains NaN values!")
                     continue
                     
                 if torch.isnan(noisy_input.input_values).any():
-                    print("Feature-extracted noisy input contains NaN values!")
+                    logger.debug("Feature-extracted noisy input contains NaN values!")
                     continue
                     
                 return {
@@ -169,7 +177,7 @@ class NoiseRobustSpeechDataset(Dataset):
                 }
                 
             except Exception as e:
-                print(f"Error during feature extraction: {e}")
+                logger.debug(f"Error during feature extraction: {e}")
                 continue
     
 

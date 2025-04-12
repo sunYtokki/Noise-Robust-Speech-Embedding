@@ -68,7 +68,11 @@ def visualize_embeddings(model: BYOLSpeechModel,
                          dataloader: DataLoader, 
                          device: torch.device,
                          log_dir: str,
+<<<<<<< HEAD
                          epoch: int,
+=======
+                         img_file_name: str,
+>>>>>>> dev
                          num_samples: int = 100):
     """
     Visualize embeddings using t-SNE.
@@ -148,7 +152,7 @@ def visualize_embeddings(model: BYOLSpeechModel,
     
     plt.title('t-SNE Visualization of Speech Embeddings')
     plt.legend()
-    plt.savefig(os.path.join(log_dir, f'tsne_embeddings_{epoch}.png'))
+    plt.savefig(os.path.join(log_dir, img_file_name))
     plt.close()
     
-    print(f"Visualization saved to {os.path.join(log_dir, f'tsne_embeddings_{epoch}.png')}")
+    print(f"Visualization saved to {os.path.join(log_dir, img_file_name)}")

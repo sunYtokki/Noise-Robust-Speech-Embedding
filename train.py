@@ -1,11 +1,8 @@
 import os
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
 from tqdm import tqdm
 import wandb
 from transformers import AutoFeatureExtractor
@@ -15,6 +12,7 @@ from src.models.byol import BYOLSpeechModel, byol_loss
 from src.data.dataset import create_dataloader
 from src.utils.debugging_utils import check_audio_tensor
 from evaluate import evaluate_embedding_similarity, visualize_embeddings
+from src.utils.logging_utils import setup_logger
 
 # Set seeds for reproducibility
 def set_seed(seed=42):
@@ -56,14 +54,24 @@ def train_one_epoch(model: BYOLSpeechModel,
         clean_input_values = batch["clean_input_values"].to(device)
         noisy_input_values = batch["noisy_input_values"].to(device)
 
+<<<<<<< HEAD
         check_audio_tensor(clean_input_values, "clean_input_values")
         check_audio_tensor(noisy_input_values, "noisy_input_values")
+=======
+        # check_audio_tensor(clean_input_values, "clean_input_values")
+        # check_audio_tensor(noisy_input_values, "noisy_input_values")
+>>>>>>> dev
         
         # Forward pass
         online_pred, target_proj = model(clean_input_values, noisy_input_values)
 
+<<<<<<< HEAD
         check_audio_tensor(online_pred, "online_pred")
         check_audio_tensor(target_proj, "target_proj")
+=======
+        # check_audio_tensor(online_pred, "online_pred")
+        # check_audio_tensor(target_proj, "target_proj")
+>>>>>>> dev
         
         # Compute loss
         loss = byol_loss(online_pred, target_proj)
@@ -90,7 +98,12 @@ def main():
     # Get configuration
     config = get_config()
     
+<<<<<<< HEAD
     # Set seed for reproducibility
+=======
+    # Set up logger and seed 
+    setup_logger(config)
+>>>>>>> dev
     set_seed()
     
     # Set device
@@ -144,10 +157,18 @@ def main():
             
         # Visualize embeddings
         if (epoch + 1) % config['logging']['visualization_interval'] == 0 or epoch == config['training']['num_epochs'] - 1:
+<<<<<<< HEAD
             visualize_embeddings(model, dataloader, device, config['training']['log_dir'], epoch + 1)
             
             # Log the visualization to wandb
             wandb.log({"embeddings": wandb.Image(os.path.join(config['training']['log_dir'], 'tsne_embeddings.png'))})
+=======
+            img_file_name = f"tsne_embeddings_{epoch+1}.png"
+            visualize_embeddings(model, dataloader, device, config['training']['log_dir'], img_file_name)
+            
+            # Log the visualization to wandb
+            wandb.log({"embeddings": wandb.Image(os.path.join(config['training']['log_dir'], img_file_name))})
+>>>>>>> dev
         
         # Save checkpoint
         if epoch_loss < best_loss:
