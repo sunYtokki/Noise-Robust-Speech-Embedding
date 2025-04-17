@@ -31,6 +31,8 @@ def parse_args():
                         help='Number of training epochs')
     parser.add_argument('--lr', type=float, default=None,
                         help='Learning rate')
+    parser.add_argument('--task', type=str, default='both', choices=['categorical', 'dimensional', 'both'], 
+                       help='Which emotion recognition task to train')
     
     return parser.parse_args()
 

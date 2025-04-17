@@ -15,7 +15,7 @@ def get_log_level(level_str: str) -> int:
     }
     return level_map.get(level_str.upper(), logging.INFO)
 
-def setup_logger(config):
+def setup_logger(config, log_dir = None):
     """
     Set up a logger with the given configuration.
     
@@ -26,7 +26,8 @@ def setup_logger(config):
         logger: Configured logger instance
     """
     # Create logs directory if it doesn't exist
-    log_dir = config['training']['log_dir']
+    if not log_dir:
+        log_dir = config['training']['log_dir']
     os.makedirs(log_dir, exist_ok=True)
     
     # Create a timestamp for the log file

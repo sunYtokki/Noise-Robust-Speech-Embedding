@@ -9,3 +9,4 @@ matplotlib
 wandb
 hydra-core
 tqdm
+seaborn

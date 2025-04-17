@@ -1,0 +1,65 @@
+# Model settings
+model:
+  name: "microsoft/wavlm-base-plus" # encoder backbone
+  projection_dim: 768
+  prediction_dim: 1024
+  ema_decay: 0.996
+
+# Training settings
+training:
+  batch_size: 64
+  num_workers: 8
+  num_epochs: 100
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  checkpoint_dir: "checkpoints/default-val_loss"
+  log_dir: "outputs/default-val_loss"
+  seed: 42
+  early_stopping_metric: "val_loss"  # Options: "val_loss" or "val_avg_similarity"
+  early_stopping_patience: 5
+  early_stopping_min_delta: 0.005
+
+# Data settings
+data:
+  clean_data_path: "/proj/speech/users/syk2145/data/Audios_en_sgmse/clean"
+  noise_data_path: "/proj/speech/projects/noise_robustness/Audioset/Audioset-train"
+  sample_rate: 16000
+  max_audio_length: 5.0  # in seconds
+  snr_range: [-10, -5, 0, 5, 10, 15, 20]
+  validation_ratio: 0.15  # 15% of data used for validation
+
+# Logging settings
+logging:
+  wandb_mode: "offline" # "online", "offline", or "disabled"
+  level: "DEBUG"      # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  console_level: "ERROR"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  metric_logging_interval: 5
+  visualization_interval: 2
+
+# Emotion recognition settings
+emotion:
+  encoder_checkpoint: "checkpoints/default-val_loss/best_val_loss.pt"  # Path to pre-trained encoder
+  checkpoint_dir: "checkpoints/emotion/default-val_loss"
+  # log_dir: "outputs/emotion/default-val_loss"
+  labels_file: "/proj/speech/projects/noise_robustness/MSP-PODCAST-Publish-1.11/Labels/labels_consensus.csv"
+  train_dataset_split: "Development"
+  validataion_dataset_split: "Test1"
+  # train_data_path: "/proj/speech/users/syk2145/data"
+  # train_labels_file: "/proj/speech/users/syk2145/baseline/NRSER/txtfile/msp1_11-train-clean.txt"
+  # val_data_path: "/proj/speech/users/syk2145/data"
+  # val_labels_file: "/proj/speech/users/syk2145/baseline/NRSER/txtfile/msp1_11-dev-clean.txt"
+  # num_emotions: 8  # Number of emotion classes
+  hidden_dim: 1024
+  batch_size: 32
+  learning_rate: 2.0e-5
+  fine_tuning_lr: 5.0e-6  # Lower learning rate for fine-tuning
+  scheduler_patience: 2  # Number of epochs with no improvement after which learning rate will be reduced
+  weight_decay: 1.0e-4
+  dropout_rate: 0.5
+  classifier_epochs: 20  # Train classifier first
+  fine_tuning_epochs: 10  # Then fine-tune with encoder
+  patience: 3  # Early stopping patience
+  unfreeze_encoder: true  # Whether to unfreeze encoder during training
+  add_noise_during_training: true  # Whether to add noise during training
+  use_class_weights: false  # Whether to use class weights for imbalanced data
+  categorical_only: true

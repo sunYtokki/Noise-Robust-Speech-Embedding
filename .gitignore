@@ -1,7 +1,6 @@
 preprocessing/
 wandb/
 checkpoints/
-outputs/
 
 __pycache__/
 *.pyc
