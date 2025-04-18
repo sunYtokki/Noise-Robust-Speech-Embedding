@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -53,6 +54,7 @@ def train_categorical_emotions(config, device='cuda'):
     # Number of emotion classes
     # num_classes = len(EmotionDataset.VALID_EMOTIONS_MAP)
     num_classes = len(train_loader.dataset.emotion_mapping)
+    # num_classes = train_loader.dataset.num_classes
     
     # Create emotion classifier
     logger.info(f"Creating emotion classifier with {num_classes} classes")
@@ -74,7 +76,7 @@ def train_categorical_emotions(config, device='cuda'):
     # Compute class weights for balanced training
     if config['emotion']['use_class_weights']:
         logger.info("Computing class weights")
-        train_labels = [train_loader.dataset.emotion_mapping]
+        train_labels = Counter([sample['category_idx'] for sample in train_loader.dataset.samples])
         class_weights = compute_class_weights(train_labels, num_classes)
         class_weights = class_weights.to(device)
         logger.info(f"Class weights: {class_weights}")
@@ -106,6 +108,7 @@ def train_categorical_emotions(config, device='cuda'):
     emotion_names = train_loader.dataset.idx_to_emotion
     
     for epoch in range(config['emotion']['classifier_epochs']):
+        logger.info(f"Epoch {epoch+1}/{config['emotion']['classifier_epochs']}")
         print(f"Epoch {epoch+1}/{config['emotion']['classifier_epochs']}")
         
         # Train for one epoch
@@ -119,6 +122,8 @@ def train_categorical_emotions(config, device='cuda'):
         )
         
         # Log metrics
+        logger.info(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
+        logger.info(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
         print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
         
@@ -147,6 +152,7 @@ def train_categorical_emotions(config, device='cuda'):
         # Save best model
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
+            logger.info(f"New best validation F1: {best_val_f1:.4f}")
             print(f"New best validation F1: {best_val_f1:.4f}")
             
             # Save model
@@ -164,15 +170,17 @@ def train_categorical_emotions(config, device='cuda'):
             patience_counter = 0
         else:
             patience_counter += 1
-            print(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
+            logger.info(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
         
         # Early stopping
         if patience_counter >= config['emotion']['patience']:
+            logger.info(f"Early stopping triggered after epoch {epoch+1}")
             print(f"Early stopping triggered after epoch {epoch+1}")
             break
     
     # Fine-tuning with encoder unfreezing
     if config['emotion']['unfreeze_encoder']:
+        logger.info("Starting fine-tuning with encoder unfreezing")
         print("Starting fine-tuning with encoder unfreezing")
         
         # Load best classifier model
@@ -203,6 +211,7 @@ def train_categorical_emotions(config, device='cuda'):
         total_layers = 24  # WavLM base has 24 layers
         
         for epoch in range(config['emotion']['fine_tuning_epochs']):
+            logger.info(f"Fine-tuning Epoch {epoch+1}/{config['emotion']['fine_tuning_epochs']}")
             print(f"Fine-tuning Epoch {epoch+1}/{config['emotion']['fine_tuning_epochs']}")
             
             # Unfreeze some layers based on schedule
@@ -216,8 +225,8 @@ def train_categorical_emotions(config, device='cuda'):
                 
                 # Unfreeze layers
                 model.unfreeze_encoder_gradually(layers_to_unfreeze)
-                print(f"Unfreezing layers {layers_to_unfreeze}")
-                print(f"Trainable parameters: {model.get_trainable_params()}")
+                logger.info(f"Unfreezing layers {layers_to_unfreeze}")
+                logger.info(f"Trainable parameters: {model.get_trainable_params()}")
             
             # Train and validate
             train_loss, train_f1 = train_one_epoch_categorical(
@@ -229,6 +238,8 @@ def train_categorical_emotions(config, device='cuda'):
             )
             
             # Log metrics
+            logger.info(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
+            logger.info(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
             print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
             print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
             
@@ -258,7 +269,9 @@ def train_categorical_emotions(config, device='cuda'):
             # Save best model
             if val_f1 > best_val_f1:
                 best_val_f1 = val_f1
+                logger.info(f"New best validation F1: {best_val_f1:.4f}")
                 print(f"New best validation F1: {best_val_f1:.4f}")
+                
                 
                 # Save model
                 torch.save({
@@ -275,15 +288,17 @@ def train_categorical_emotions(config, device='cuda'):
                 patience_counter = 0
             else:
                 patience_counter += 1
-                print(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
+                logger.info(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
             
             # Early stopping
             if patience_counter >= config['emotion']['patience']:
+                logger.info(f"Early stopping triggered after fine-tuning epoch {epoch+1}")
                 print(f"Early stopping triggered after fine-tuning epoch {epoch+1}")
                 break
     
     # Finish wandb run
     wandb.finish()
+    logger.info(f"Categorical emotion training complete! Best F1: {best_val_f1:.4f}")
     print(f"Categorical emotion training complete! Best F1: {best_val_f1:.4f}")
     
     return best_val_f1
@@ -305,6 +320,7 @@ def train_one_epoch_categorical(model, dataloader, optimizer, device, class_weig
         
         # Calculate loss with class weights if provided
         if class_weights is not None:
+            # loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
             loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
@@ -392,11 +408,11 @@ def validate_categorical(model, dataloader, device, class_weights=None, emotion_
         )
         
         # Log per-class metrics
-        print("Per-class validation metrics:")
+        logger.info("Per-class validation metrics:")
         for cls_idx in range(num_classes):
             cls_name = emotion_names.get(cls_idx, f"Class {cls_idx}")
             if cls_name in report:
-                print(f"  {cls_name}: F1={report[cls_name]['f1-score']:.4f}, Precision={report[cls_name]['precision']:.4f}, Recall={report[cls_name]['recall']:.4f}")
+                logger.info(f"  {cls_name}: F1={report[cls_name]['f1-score']:.4f}, Precision={report[cls_name]['precision']:.4f}, Recall={report[cls_name]['recall']:.4f}")
     else:
         report = None
     
@@ -417,17 +433,24 @@ def validate_categorical(model, dataloader, device, class_weights=None, emotion_
 
 def compute_class_weights(labels, num_classes):
     """Compute class weights based on label distribution."""
-    count = Counter(labels)
+    # count = Counter(labels)
     class_weights = torch.ones(num_classes)
-    total = sum(count.values())
+    total = sum(labels.values())
     
-    for cls, cnt in count.items():
+    for cls, cnt in labels.items():
         if cls >= 0 and cls < num_classes:  # Ensure valid class index
             # Apply stronger weight to rare classes
             class_weights[cls] = (total / (cnt * num_classes)) ** 1.5  # Exponent for stronger weighting
     
     return class_weights
 
+# TODO: try focal loss
+def focal_loss(logits, labels, gamma=2.0, alpha=None):
+    """Focal loss for multi-class classification with imbalanced data."""
+    ce_loss = F.cross_entropy(logits, labels, reduction='none', weight=alpha)
+    pt = torch.exp(-ce_loss)
+    loss = (1 - pt) ** gamma * ce_loss
+    return loss.mean()
 
 def plot_confusion_matrix(cm, class_names, filename='confusion_matrix.png', title='Confusion Matrix'):
     """Plot and save confusion matrix."""

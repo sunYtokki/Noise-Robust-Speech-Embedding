@@ -65,6 +65,7 @@ class EmotionDataset(Dataset):
             self.emotion_mapping = self.VALID_EMOTIONS_MAP
         else:
             self.emotion_mapping = self.EMOTIONS_MAP
+        # self.num_classes = len(self.emotion_mapping.keys())
         self.idx_to_emotion = {v: k for k, v in self.emotion_mapping.items()}
         
         # Parse labels file
@@ -138,9 +139,9 @@ class EmotionDataset(Dataset):
             logger.info(f"Found {len(self.noise_files)} noise files for augmentation")
         
         # Log category distribution
-        self.log_category_distribution()
+        self._log_category_distribution()
     
-    def log_category_distribution(self):
+    def _log_category_distribution(self):
         """Log the distribution of emotion categories."""
         from collections import Counter
         category_counts = Counter([sample['category'] for sample in self.samples])

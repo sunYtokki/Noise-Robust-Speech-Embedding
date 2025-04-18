@@ -39,13 +39,11 @@ logging:
 # Emotion recognition settings
 emotion:
   encoder_checkpoint: "checkpoints/default-val_loss/best_val_loss.pt"  # Path to pre-trained encoder
-  checkpoint_dir: "checkpoints/emotion/default-val_loss"
+  checkpoint_dir: "checkpoints/emotion/dev_emotion"
   # log_dir: "outputs/emotion/default-val_loss"
   labels_file: "/proj/speech/projects/noise_robustness/MSP-PODCAST-Publish-1.11/Labels/labels_consensus.csv"
-  # train_dataset_split: "Development"
-  # validataion_dataset_split: "Test1"
-  train_dataset_split: "Train"
-  validataion_dataset_split: "Development"
+  train_dataset_split: "Development"
+  validataion_dataset_split: "Test1"
   hidden_dim: 1024
   batch_size: 32
   learning_rate: 2.0e-5
