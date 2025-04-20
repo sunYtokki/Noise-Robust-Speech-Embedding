@@ -9,7 +9,7 @@ from transformers import AutoFeatureExtractor
 
 from config.config_utils import get_config
 from src.models.byol import BYOLSpeechModel, byol_loss
-from data.noisy_speech_dataset import create_dataloaders
+from src.data.noisy_speech_dataset import create_dataloaders
 from src.utils.debugging_utils import check_audio_tensor
 from evaluate_byol import visualize_embeddings, validate_model
 from src.utils.logging_utils import setup_logger

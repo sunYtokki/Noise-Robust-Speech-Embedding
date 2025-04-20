@@ -18,4 +18,4 @@ dependencies:
     - matplotlib
     - wandb
     - hydra-core
-    - tqdm
+- tqdm

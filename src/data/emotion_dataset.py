@@ -32,7 +32,7 @@ class EmotionDataset(Dataset):
     def __init__(self, 
                  labels_file="/proj/speech/projects/noise_robustness/MSP-PODCAST-Publish-1.11/Labels/labels_consensus.csv",
                  audio_dir="/proj/speech/projects/noise_robustness/MSP-PODCAST-Publish-1.11/Audios",
-                 noise_dir=None,
+                 noise_dir="/proj/speech/projects/noise_robustness/Audioset/Audioset-train",
                  split=None,  # Can be "Train", "Development", "Test1", "Test2", "Test3" or None to use all
                  feature_extractor=None,
                  sample_rate=16000,
@@ -268,3 +268,42 @@ def create_emotion_dataloaders(config, feature_extractor):
     )
 
     return train_loader, val_loader
+
+
+def collate_fn_normalize_for_baseline(batch, mean, std):
+    """Custom collate function that handles normalization and masking exactly as in the HF example."""
+    # Extract waveforms and labels
+    waveforms = [item["waveform"].numpy() for item in batch]
+    
+    # Get other fields that might be present
+    batch_dict = {
+        'file_path': [item.get('file_path', f"sample_{i}") for i, item in enumerate(batch)]
+    }
+    
+    # Add any other fields that are in the batch
+    for key in batch[0].keys():
+        if key != "waveform" and key != "file_path":
+            batch_dict[key] = [item[key] for item in batch]
+    
+    # Normalize waveforms with mean/std exactly as in the example
+    normalized_waveforms = []
+    masks = []
+    
+    for waveform in waveforms:
+        # Normalize using the model's mean/std
+        norm_wav = (waveform - mean) / (std + 0.000001)
+        
+        # Generate the mask with shape (1, len) exactly as in the example
+        mask = torch.ones(1, len(norm_wav))
+        
+        # Convert to tensor and add dim exactly as in the example
+        wav_tensor = torch.tensor(norm_wav).unsqueeze(0)  # Shape: (1, len)
+        
+        normalized_waveforms.append(wav_tensor)
+        masks.append(mask)
+    
+    # Add normalized waveforms and masks to batch dict
+    batch_dict['normalized_waveform'] = normalized_waveforms
+    batch_dict['mask'] = masks
+    
+    return batch_dict
