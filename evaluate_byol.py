@@ -65,7 +65,7 @@ def evaluate_embedding_similarity(model: BYOLSpeechModel,
     
     return avg_similarities
 
-
+@torch.no_grad()
 def validate_model(model: BYOLSpeechModel, 
                   val_loader: DataLoader, 
                   device: torch.device,

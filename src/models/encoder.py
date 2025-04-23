@@ -14,20 +14,22 @@ class WavLMEncoder(nn.Module):
         self.model = AutoModel.from_pretrained(model_name)
         self.output_dim = self.model.config.hidden_size
         
-    def forward(self, input_values: torch.Tensor) -> torch.Tensor:
+    def forward(self, input_values: torch.Tensor, attention_mask=None) -> torch.Tensor:
         """Extract embeddings from WavLM model."""
         # Check input shape and reshape if needed
         if input_values.dim() == 3:  # [batch_size, 1, sequence_length]
             input_values = input_values.squeeze(1)  # [batch_size, sequence_length]
         
-        # outputs has shape (batch_size, sequence_length, hidden_size)
-        outputs = self.model(input_values).last_hidden_state
+        # For compatibility with BYOL training, we don't use the attention mask
+        # in the underlying model call, but still accept it as a parameter
+        outputs = self.model(input_values)
         
-        # Pool the outputs to get a fixed-size representation
-        # Using mean pooling over the sequence dimension
-        embeddings = torch.mean(outputs, dim=1)
+        # If we're getting the full transformer output object, extract the last hidden state
+        if hasattr(outputs, 'last_hidden_state'):
+            return outputs.last_hidden_state
         
-        return embeddings
+        # Otherwise, assume it's already the tensor we want
+        return outputs
 
 def main():
     # test the WavLMEncoder

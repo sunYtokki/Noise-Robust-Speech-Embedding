@@ -314,11 +314,17 @@ def train_one_epoch_dimensional(model, dataloader, optimizer, device):
         valence = batch["V"].to(device)
         dominance = batch["D"].to(device)
         
+        # Get attention mask if available, otherwise create a default one
+        if "attention_mask" in batch:
+            attention_mask = batch["attention_mask"].to(device)
+        else:
+            attention_mask = torch.ones(inputs.size(0), inputs.size(1)).to(device)
+        
         # Combine dimensions for model input
         labels = torch.stack([arousal, valence, dominance], dim=1)
         
-        # Forward pass
-        _, dimensional_values = model(inputs, task='dimensional')
+        # Forward pass with attention mask
+        _, dimensional_values = model(inputs, attention_mask=attention_mask, task='dimensional')
         
         # Calculate CCC loss
         loss = ccc_loss(dimensional_values, labels)
@@ -364,11 +370,17 @@ def validate_dimensional(model, dataloader, device, log_dir=None):
             valence = batch["V"].to(device)
             dominance = batch["D"].to(device)
             
+            # Get attention mask if available, otherwise create a default one
+            if "attention_mask" in batch:
+                attention_mask = batch["attention_mask"].to(device)
+            else:
+                attention_mask = torch.ones(inputs.size(0), inputs.size(1)).to(device)
+            
             # Combine dimensions for model input
             labels = torch.stack([arousal, valence, dominance], dim=1)
             
-            # Forward pass
-            _, dimensional_values = model(inputs, task='dimensional')
+            # Forward pass with attention mask
+            _, dimensional_values = model(inputs, attention_mask=attention_mask, task='dimensional')
             
             # Calculate CCC loss
             loss = ccc_loss(dimensional_values, labels)

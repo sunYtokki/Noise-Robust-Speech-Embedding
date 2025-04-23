@@ -125,5 +125,5 @@ def byol_loss(online_pred: torch.Tensor, target_proj: torch.Tensor) -> torch.Ten
     similarity = torch.sum(online_pred * target_proj, dim=1)
     similarity = torch.clamp(similarity, min=-1.0, max=1.0)
     loss = 2 - 2 * similarity.mean()
-    
+
     return loss

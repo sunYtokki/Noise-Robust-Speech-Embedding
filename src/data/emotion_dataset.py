@@ -190,6 +190,7 @@ class EmotionDataset(Dataset):
             )
             return {
                 "input_values": inputs.input_values.squeeze(0),
+                "attention_mask": inputs.attention_mask.squeeze(0) if hasattr(inputs, 'attention_mask') else torch.ones(inputs.input_values.shape[1]),
                 "C": sample['category_idx'],
                 "A": sample['arousal'],
                 "V": sample['valence'],
@@ -198,12 +199,13 @@ class EmotionDataset(Dataset):
         else:
             return {
                 "waveform": noisy_waveform.squeeze(0),
+                "attention_mask": torch.ones(noisy_waveform.shape[1]),
                 "C": sample['category_idx'],
                 "A": sample['arousal'],
                 "V": sample['valence'],
                 "D": sample['dominance']
-            }
-    
+            }    
+
     def _load_and_process_audio(self, file_path):
         """Load and process audio file."""
         waveform = load_and_process_audio(

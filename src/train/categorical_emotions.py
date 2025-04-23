@@ -42,19 +42,18 @@ def train_categorical_emotions(config, device='cuda'):
     feature_extractor = AutoFeatureExtractor.from_pretrained(config['model']['name'])
     
     # Load pre-trained encoder
-    logger.info(f"Loading pre-trained encoder from {config['emotion']['encoder_checkpoint']}")
     byol_model = BYOLSpeechModel(config)
-    checkpoint = torch.load(config['emotion']['encoder_checkpoint'], map_location=device)
-    byol_model.load_state_dict(checkpoint['model_state_dict'])
+    if 'encoder_checkpoint' in config['emotion'] and config['emotion']['encoder_checkpoint']:
+        logger.info(f"Loading pre-trained encoder from {config['emotion']['encoder_checkpoint']}")
+        checkpoint = torch.load(config['emotion']['encoder_checkpoint'], map_location=device)
+        byol_model.load_state_dict(checkpoint['model_state_dict'])
     encoder = byol_model.get_encoder()
     
     # Get data loaders
     train_loader, val_loader = create_emotion_dataloaders(config, feature_extractor)
 
     # Number of emotion classes
-    # num_classes = len(EmotionDataset.VALID_EMOTIONS_MAP)
     num_classes = len(train_loader.dataset.emotion_mapping)
-    # num_classes = train_loader.dataset.num_classes
     
     # Create emotion classifier
     logger.info(f"Creating emotion classifier with {num_classes} classes")
@@ -315,12 +314,17 @@ def train_one_epoch_categorical(model, dataloader, optimizer, device, class_weig
         inputs = batch["input_values"].to(device)
         labels = batch["C"].to(device)
         
-        # Forward pass
-        categorical_logits, _ = model(inputs, task='categorical')
+        # Get attention mask if available, otherwise create a default one
+        if "attention_mask" in batch:
+            attention_mask = batch["attention_mask"].to(device)
+        else:
+            attention_mask = torch.ones(inputs.size(0), inputs.size(1)).to(device)
+        
+        # Forward pass with attention mask
+        categorical_logits, _ = model(inputs, attention_mask=attention_mask, task='categorical')
         
         # Calculate loss with class weights if provided
         if class_weights is not None:
-            # loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
             loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
         else:
             loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
@@ -364,8 +368,14 @@ def validate_categorical(model, dataloader, device, class_weights=None, emotion_
             inputs = batch["input_values"].to(device)
             labels = batch["C"].to(device)
             
-            # Forward pass
-            categorical_logits, _ = model(inputs, task='categorical')
+            # Get attention mask if available, otherwise create a default one
+            if "attention_mask" in batch:
+                attention_mask = batch["attention_mask"].to(device)
+            else:
+                attention_mask = torch.ones(inputs.size(0), inputs.size(1)).to(device)
+            
+            # Forward pass with attention mask
+            categorical_logits, _ = model(inputs, attention_mask=attention_mask, task='categorical')
             
             # Calculate loss with class weights if provided
             if class_weights is not None:

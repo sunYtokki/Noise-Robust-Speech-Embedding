@@ -2,10 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.models.pool import AttentiveStatisticsPooling
+
+
 class EmotionClassifier(nn.Module):
     """
     Emotion classifier for both categorical and dimensional emotion recognition.
-    Based on MSP-Podcast Challenge approach.
+    Uses AttentiveStatisticsPooling for improved feature extraction.
     """
     def __init__(self, encoder, hidden_dim=1024, dropout=0.5, num_emotions=8):
         """
@@ -22,9 +25,15 @@ class EmotionClassifier(nn.Module):
         self.input_dim = encoder.output_dim
         self.hidden_dim = hidden_dim
         
+        # Add attentive statistics pooling layer
+        self.pooling = AttentiveStatisticsPooling(self.input_dim)
+        
+        # Double the input dimension as the pooling concatenates mean and std
+        pooled_dim = self.input_dim * 2
+        
         # Shared layers
         self.shared_fc = nn.Sequential(
-            nn.Linear(self.input_dim, hidden_dim),
+            nn.Linear(pooled_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout)
@@ -48,22 +57,34 @@ class EmotionClassifier(nn.Module):
         )
         self.dimensional_out = nn.Linear(hidden_dim, 3)  # A, V, D
     
-    def forward(self, x, task='both'):
+    def forward(self, x, attention_mask=None, task='both'):
         """
         Forward pass through the network.
         
         Args:
             x: Input tensor
+            attention_mask: Attention mask for variable-length sequences
             task: 'categorical', 'dimensional', or 'both'
             
         Returns:
             Tuple of (categorical_logits, dimensional_values) depending on task
         """
-        # Encoder
-        embeddings = self.encoder(x)
+        encoder_outputs = self.encoder(x, attention_mask=attention_mask)
+
+        # Create default mask if not provided
+        if attention_mask is None:
+            attention_mask = torch.ones(x.shape[0], encoder_outputs.shape[1], device=x.device)
+            
+        # Apply pooling
+        if hasattr(self, 'pooling'):
+            # Apply attentive statistics pooling
+            features = self.pooling(encoder_outputs, attention_mask)
+        else:
+            # Apply mean pooling
+            features = torch.mean(encoder_outputs, dim=1)
         
         # Shared layers
-        shared_features = self.shared_fc(embeddings)
+        shared_features = self.shared_fc(features)
         
         # Task-specific outputs
         if task == 'categorical' or task == 'both':

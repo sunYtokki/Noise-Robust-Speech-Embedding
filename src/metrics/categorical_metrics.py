@@ -136,6 +136,7 @@ def main():
     valid_indices = [i for i, label in enumerate(y_pred) if label in valid_emotions]
     if len(valid_indices) < len(y_pred):
         print(f"Filtered out {len(y_pred) - len(valid_indices)} predictions that were not valid emotion labels.")
+        # y_true = np.array([y_true[i] for i in valid_indices])
         y_true = np.array([y_true[i] for i in valid_indices])
         y_pred = np.array([y_pred[i] for i in valid_indices])
     
