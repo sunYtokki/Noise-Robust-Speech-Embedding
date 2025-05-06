@@ -1,0 +1,4 @@
+{
+    "wav_dir": "/proj/speech/users/syk2145/baseline/MSP-Podcast_Challenge/Audios/",
+    "label_path": "/proj/speech/users/syk2145/nrse/labels/processed/baselin_noisy_train_cleaned.csv"
+}
