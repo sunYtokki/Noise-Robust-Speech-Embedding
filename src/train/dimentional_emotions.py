@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from src.models.byol import BYOLSpeechModel
 from src.models.emotion import EmotionClassifier
-from src.data.emotion_dataset import EmotionDataset
+from src.data.emotion_dataset import EmotionDataset, create_emotion_dataloaders
 from src.utils.logging_utils import setup_logger, logger
 from src.utils.setup_utils import set_seed
 
@@ -23,7 +23,7 @@ def train_dimensional_emotions(config, device='cuda'):
     
     # Create output directories
     checkpoint_dir = os.path.join(config['emotion']['checkpoint_dir'], 'dimensional')
-    log_dir = os.path.join(config['emotion']['log_dir'], 'dimensional')
+    log_dir = os.path.join(config['training']['log_dir'], 'dimensional')
     os.makedirs(checkpoint_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
     
@@ -59,46 +59,48 @@ def train_dimensional_emotions(config, device='cuda'):
     logger.info(f"Trainable parameters after freezing encoder: {model.get_trainable_params()}")
     
     # Create datasets
-    logger.info("Creating datasets")
-    train_dataset = EmotionDataset(
-        labels_file=config['emotion']['labels_file'],
-        audio_dir=config['emotion']['audio_dir'],
-        split="Train",
-        feature_extractor=feature_extractor,
-        sample_rate=config['data']['sample_rate'],
-        max_audio_length=config['data']['max_audio_length'],
-        add_noise=config['emotion']['add_noise_during_training'],
-        noise_dir=config['data']['noise_data_path'],
-        snr_range=config['data']['snr_range'],
-        emotion_mapping=EmotionDataset.VALID_EMOTIONS_MAP,
-        categorical_only=False  # Include all samples for dimensional task
-    )
+    # logger.info("Creating datasets")
+    # train_dataset = EmotionDataset(
+    #     labels_file=config['emotion']['labels_file'],
+    #     audio_dir=config['emotion']['audio_dir'],
+    #     split="Train",
+    #     feature_extractor=feature_extractor,
+    #     sample_rate=config['data']['sample_rate'],
+    #     max_audio_length=config['data']['max_audio_length'],
+    #     add_noise=config['emotion']['add_noise_during_training'],
+    #     noise_dir=config['data']['noise_data_path'],
+    #     snr_range=config['data']['snr_range'],
+    #     emotion_mapping=EmotionDataset.VALID_EMOTIONS_MAP,
+    #     categorical_only=False  # Include all samples for dimensional task
+    # )
     
-    val_dataset = EmotionDataset(
-        labels_file=config['emotion']['labels_file'],
-        audio_dir=config['emotion']['audio_dir'],
-        split="Development",
-        feature_extractor=feature_extractor,
-        sample_rate=config['data']['sample_rate'],
-        max_audio_length=config['data']['max_audio_length'],
-        emotion_mapping=EmotionDataset.VALID_EMOTIONS_MAP,
-        categorical_only=False  # Include all samples for dimensional task
-    )
+    # val_dataset = EmotionDataset(
+    #     labels_file=config['emotion']['labels_file'],
+    #     audio_dir=config['emotion']['audio_dir'],
+    #     split="Development",
+    #     feature_extractor=feature_extractor,
+    #     sample_rate=config['data']['sample_rate'],
+    #     max_audio_length=config['data']['max_audio_length'],
+    #     emotion_mapping=EmotionDataset.VALID_EMOTIONS_MAP,
+    #     categorical_only=False  # Include all samples for dimensional task
+    # )
     
     # Create dataloaders
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config['emotion']['batch_size'],
-        shuffle=True,
-        num_workers=config['training']['num_workers']
-    )
+    # train_loader = DataLoader(
+    #     train_dataset,
+    #     batch_size=config['emotion']['batch_size'],
+    #     shuffle=True,
+    #     num_workers=config['training']['num_workers']
+    # )
     
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config['emotion']['batch_size'],
-        shuffle=False,
-        num_workers=config['training']['num_workers']
-    )
+    # val_loader = DataLoader(
+    #     val_dataset,
+    #     batch_size=config['emotion']['batch_size'],
+    #     shuffle=False,
+    #     num_workers=config['training']['num_workers']
+    # )
+
+    train_loader, val_loader = create_emotion_dataloaders(config, feature_extractor)
     
     # Create optimizer
     optimizer = optim.AdamW(
@@ -190,7 +192,7 @@ def train_dimensional_emotions(config, device='cuda'):
         logger.info("Starting fine-tuning with encoder unfreezing")
         
         # Load best classifier model
-        checkpoint = torch.load(os.path.join(checkpoint_dir, 'best_classifier_model.pt'))
+        checkpoint = torch.load(os.path.join(checkpoint_dir, 'best_classifier_model.pt'), weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
         
         # Reset best CCC and patience counter

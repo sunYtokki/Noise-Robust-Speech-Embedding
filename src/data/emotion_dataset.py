@@ -65,7 +65,6 @@ class EmotionDataset(Dataset):
             self.emotion_mapping = self.VALID_EMOTIONS_MAP
         else:
             self.emotion_mapping = self.EMOTIONS_MAP
-        # self.num_classes = len(self.emotion_mapping.keys())
         self.idx_to_emotion = {v: k for k, v in self.emotion_mapping.items()}
         
         # Parse labels file
@@ -152,7 +151,6 @@ class EmotionDataset(Dataset):
             percentage = (count / total_samples) * 100
             logger.info(f"  {category}: {count} samples ({percentage:.2f}%)")
     
-    
     def __len__(self):
         return len(self.samples)
     
@@ -160,37 +158,65 @@ class EmotionDataset(Dataset):
         """Get a sample from the dataset."""
         sample = self.samples[idx]
         
-        # Load and process audio
-        waveform = self._load_and_process_audio(sample['file_path'])
+        # Load and process audio - now returns (waveform, actual_length)
+        waveform_info = self._load_and_process_audio(sample['file_path'])
         
+        # Handle potential errors in audio loading
+        if waveform_info is None:
+            # Create a fallback tensor of small non-zero values
+            logger.warning(f"Creating fallback tensor for {sample['file_path']}")
+            waveform = torch.ones((1, self.max_samples)) * 1e-6
+            actual_length = self.max_samples  # Treat as full length
+        else:
+            waveform, actual_length = waveform_info
+            
+        # Create attention mask based on actual audio length
+        attention_mask = torch.zeros(self.max_samples)
+        attention_mask[:actual_length] = 1.0
+            
         # Add noise if specified
         if self.add_noise and hasattr(self, 'noise_files') and len(self.noise_files) > 0:
             # Select random noise file
             noise_idx = random.randint(0, len(self.noise_files) - 1)
-            noise = self._load_and_process_audio(self.noise_files[noise_idx])
+            noise_info = self._load_and_process_audio(self.noise_files[noise_idx])
             
-            # Select random SNR
-            snr = random.choice(self.snr_range)
-            
-            # Add noise to speech
-            noisy_waveform = add_noise_to_speech(waveform, noise, snr)
-            
-            # If noise addition failed, use original waveform
-            if noisy_waveform is None:
-                noisy_waveform = waveform
-        else:
-            noisy_waveform = waveform
+            if noise_info is not None:
+                noise, _ = noise_info
+                
+                # Select random SNR
+                snr = random.choice(self.snr_range)
+                
+                # Add noise to speech
+                noisy_waveform = add_noise_to_speech(waveform, noise, snr)
+                
+                # If noise addition succeeded, use the noisy waveform
+                if noisy_waveform is not None:
+                    waveform = noisy_waveform
+                    # Note: we keep the original attention mask since the length hasn't changed
         
         # Process with feature extractor
         if self.feature_extractor:
             inputs = self.feature_extractor(
-                noisy_waveform.squeeze().numpy(),
+                waveform.squeeze().numpy(),
                 sampling_rate=self.sample_rate,
                 return_tensors="pt"
             )
+            
+            # Make sure attention mask has the right shape to match input_values
+            if inputs.input_values.shape[1] != attention_mask.shape[0]:
+                # Resize attention mask to match the processed input
+                if inputs.input_values.shape[1] > attention_mask.shape[0]:
+                    # If feature extractor made the sequence longer, pad the mask
+                    new_mask = torch.zeros(inputs.input_values.shape[1])
+                    new_mask[:attention_mask.shape[0]] = attention_mask
+                else:
+                    # If feature extractor made the sequence shorter, truncate the mask
+                    new_mask = attention_mask[:inputs.input_values.shape[1]]
+                attention_mask = new_mask
+                
             return {
                 "input_values": inputs.input_values.squeeze(0),
-                "attention_mask": inputs.attention_mask.squeeze(0) if hasattr(inputs, 'attention_mask') else torch.ones(inputs.input_values.shape[1]),
+                "attention_mask": attention_mask,
                 "C": sample['category_idx'],
                 "A": sample['arousal'],
                 "V": sample['valence'],
@@ -198,32 +224,47 @@ class EmotionDataset(Dataset):
             }
         else:
             return {
-                "waveform": noisy_waveform.squeeze(0),
-                "attention_mask": torch.ones(noisy_waveform.shape[1]),
+                "waveform": waveform.squeeze(0),
+                "attention_mask": attention_mask,
                 "C": sample['category_idx'],
                 "A": sample['arousal'],
                 "V": sample['valence'],
                 "D": sample['dominance']
-            }    
+            }
 
     def _load_and_process_audio(self, file_path):
-        """Load and process audio file."""
-        waveform = load_and_process_audio(
-            file_path, 
-            sample_rate=self.sample_rate,
-            max_audio_length=self.max_samples/self.sample_rate,
-            random_crop=True
-        )
+        """
+        Load and process audio file.
         
-        if waveform is None:
-            # TODO: verify if this is valid way
-            # Return a small non-zero tensor to avoid crashes
-            logger.warning(f"Returning fallback tensor for {file_path}")
-            return torch.ones((1, self.max_samples)) * 1e-6
-        
-        return waveform
+        Returns:
+            tuple: (waveform, actual_length) or None if loading failed
+        """
+        try:
+            waveform = load_and_process_audio(
+                file_path, 
+                sample_rate=self.sample_rate,
+                max_audio_length=self.max_samples/self.sample_rate,
+                random_crop=True
+            )
+            
+            if waveform is None:
+                return None
+                
+            # Get actual length (bounded by max_samples)
+            actual_length = min(waveform.shape[1], self.max_samples)
+            
+            # Ensure waveform is at most max_samples long
+            if waveform.shape[1] > self.max_samples:
+                waveform = waveform[:, :self.max_samples]
+            
+            return waveform, actual_length
+            
+        except Exception as e:
+            logger.error(f"Error loading audio {file_path}: {e}")
+            return None
 
 
+# Keep the rest of the functions unchanged
 def create_emotion_dataloaders(config, feature_extractor):
     # Create datasets
     logger.info("Creating datasets")
@@ -270,42 +311,3 @@ def create_emotion_dataloaders(config, feature_extractor):
     )
 
     return train_loader, val_loader
-
-
-def collate_fn_normalize_for_baseline(batch, mean, std):
-    """Custom collate function that handles normalization and masking exactly as in the HF example."""
-    # Extract waveforms and labels
-    waveforms = [item["waveform"].numpy() for item in batch]
-    
-    # Get other fields that might be present
-    batch_dict = {
-        'file_path': [item.get('file_path', f"sample_{i}") for i, item in enumerate(batch)]
-    }
-    
-    # Add any other fields that are in the batch
-    for key in batch[0].keys():
-        if key != "waveform" and key != "file_path":
-            batch_dict[key] = [item[key] for item in batch]
-    
-    # Normalize waveforms with mean/std exactly as in the example
-    normalized_waveforms = []
-    masks = []
-    
-    for waveform in waveforms:
-        # Normalize using the model's mean/std
-        norm_wav = (waveform - mean) / (std + 0.000001)
-        
-        # Generate the mask with shape (1, len) exactly as in the example
-        mask = torch.ones(1, len(norm_wav))
-        
-        # Convert to tensor and add dim exactly as in the example
-        wav_tensor = torch.tensor(norm_wav).unsqueeze(0)  # Shape: (1, len)
-        
-        normalized_waveforms.append(wav_tensor)
-        masks.append(mask)
-    
-    # Add normalized waveforms and masks to batch dict
-    batch_dict['normalized_waveform'] = normalized_waveforms
-    batch_dict['mask'] = masks
-    
-    return batch_dict

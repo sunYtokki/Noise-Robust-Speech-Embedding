@@ -7,8 +7,8 @@ from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, f1_score
 
 from src.models.byol import BYOLSpeechModel
-from src.models.emotion_classifier import EmotionClassifier
-from data.noisy_speech_dataset import create_dataloaders
+from src.models.emotion import EmotionClassifier
+from src.data.noisy_speech_dataset import create_dataloaders
 from config.config_utils import get_config
 
 def main():

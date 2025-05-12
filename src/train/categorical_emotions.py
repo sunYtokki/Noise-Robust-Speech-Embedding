@@ -107,7 +107,6 @@ def train_categorical_emotions(config, device='cuda'):
     emotion_names = train_loader.dataset.idx_to_emotion
     
     for epoch in range(config['emotion']['classifier_epochs']):
-        logger.info(f"Epoch {epoch+1}/{config['emotion']['classifier_epochs']}")
         print(f"Epoch {epoch+1}/{config['emotion']['classifier_epochs']}")
         
         # Train for one epoch
@@ -121,8 +120,6 @@ def train_categorical_emotions(config, device='cuda'):
         )
         
         # Log metrics
-        logger.info(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
-        logger.info(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
         print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
         
@@ -169,11 +166,11 @@ def train_categorical_emotions(config, device='cuda'):
             patience_counter = 0
         else:
             patience_counter += 1
-            logger.info(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
+            print(f"Patience counter: {patience_counter}/{config['emotion']['patience']}")
+
         
         # Early stopping
         if patience_counter >= config['emotion']['patience']:
-            logger.info(f"Early stopping triggered after epoch {epoch+1}")
             print(f"Early stopping triggered after epoch {epoch+1}")
             break
     
@@ -209,6 +206,7 @@ def train_categorical_emotions(config, device='cuda'):
         # Gradually unfreeze layers
         total_layers = 24  # WavLM base has 24 layers
         
+        # TODO: match with the other training loop
         for epoch in range(config['emotion']['fine_tuning_epochs']):
             logger.info(f"Fine-tuning Epoch {epoch+1}/{config['emotion']['fine_tuning_epochs']}")
             print(f"Fine-tuning Epoch {epoch+1}/{config['emotion']['fine_tuning_epochs']}")
@@ -323,14 +321,9 @@ def train_one_epoch_categorical(model, dataloader, optimizer, device, class_weig
         # Forward pass with attention mask
         categorical_logits, _ = model(inputs, attention_mask=attention_mask, task='categorical')
         
-        # Calculate loss with class weights if provided
-        if class_weights is not None:
-            loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
-        else:
-            loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
-            
-        loss = loss_fn(categorical_logits, labels)
-        
+        # Custom loss function that handles invalid labels
+        loss = CE_weight_category(categorical_logits, labels, class_weights)
+
         # Backward pass
         optimizer.zero_grad()
         loss.backward()
@@ -343,7 +336,7 @@ def train_one_epoch_categorical(model, dataloader, optimizer, device, class_weig
         all_preds.extend(preds.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
     
-    # Compute metrics
+    # Compute metrics - filter invalid labels for F1 calculation
     valid_indices = np.array(all_labels) >= 0
     filtered_preds = np.array(all_preds)[valid_indices]
     filtered_labels = np.array(all_labels)[valid_indices]
@@ -368,7 +361,7 @@ def validate_categorical(model, dataloader, device, class_weights=None, emotion_
             inputs = batch["input_values"].to(device)
             labels = batch["C"].to(device)
             
-            # Get attention mask if available, otherwise create a default one
+            # Get attention mask if available
             if "attention_mask" in batch:
                 attention_mask = batch["attention_mask"].to(device)
             else:
@@ -377,13 +370,8 @@ def validate_categorical(model, dataloader, device, class_weights=None, emotion_
             # Forward pass with attention mask
             categorical_logits, _ = model(inputs, attention_mask=attention_mask, task='categorical')
             
-            # Calculate loss with class weights if provided
-            if class_weights is not None:
-                loss_fn = nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
-            else:
-                loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
-                
-            loss = loss_fn(categorical_logits, labels)
+            # Use the same custom loss function as in training
+            loss = CE_weight_category(categorical_logits, labels, class_weights)
             
             # Track metrics
             val_loss += loss.item()
@@ -461,6 +449,39 @@ def focal_loss(logits, labels, gamma=2.0, alpha=None):
     pt = torch.exp(-ce_loss)
     loss = (1 - pt) ** gamma * ce_loss
     return loss.mean()
+
+def CE_weight_category(logits, labels, weights=None):
+    """
+    Custom cross entropy loss that handles invalid labels without using ignore_index.
+    
+    Args:
+        logits: Model predictions [batch_size, num_classes]
+        labels: Target labels [batch_size]
+        weights: Optional class weights [num_classes]
+        
+    Returns:
+        loss: Scalar loss value
+    """
+    # Create mask for valid labels (non-negative and within range)
+    valid_mask = (labels >= 0) & (labels < logits.size(1))
+    
+    # Check if any valid samples exist
+    if not valid_mask.any():
+        # Return zero loss if no valid samples (with grad tracking)
+        return torch.tensor(0.0, device=logits.device, requires_grad=True)
+    
+    # Filter to valid samples only
+    valid_logits = logits[valid_mask]
+    valid_labels = labels[valid_mask]
+    
+    # Apply standard cross entropy with optional class weights
+    if weights is not None:
+        loss_fn = nn.CrossEntropyLoss(weight=weights)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+        
+    return loss_fn(valid_logits, valid_labels)
+
 
 def plot_confusion_matrix(cm, class_names, filename='confusion_matrix.png', title='Confusion Matrix'):
     """Plot and save confusion matrix."""
